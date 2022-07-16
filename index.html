@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    <canvas id="can"></canvas>
+    <script>
+
+        class Vector {
+
+            constructor(x, y, z = 0) {
+                this.x = x
+                this.y = y
+                this.z = z
+            }
+
+            scalar2(vector) {
+                return this.x * vector.x + this.y * vector.y
+            }
+
+            scalar3(vector) {
+                return this.x * vector.x + this.y * vector.y + this.z * vector.z
+            }
+
+            static get gradient() {
+                const x1y1 = [
+                    new Vector(1, 1, 0),
+                    new Vector(-1, 1, 0),
+                    new Vector(1, -1, 0),
+                    new Vector(-1, -1, 0)
+                ]
+
+                const x1z1 = [
+                    new Vector(1, 0, 1),
+                    new Vector(-1, 0, 1),
+                    new Vector(1, 0, -1),
+                    new Vector(-1, 0, -1)
+                ]
+
+                const y1z1 = [
+                    new Vector(0, 1, 1),
+                    new Vector(0, -1, 1),
+                    new Vector(0, 1, -1),
+                    new Vector(0, -1, -1)
+                ]
+
+                return [...x1y1, ...x1z1, ...y1z1]
+            }
+        }
+
+        class GradientTable {
+
+            #permBase = [151, 160, 137, 91, 90, 15,
+                131, 13, 201, 95, 96, 53, 194, 233, 7, 225, 140, 36, 103, 30, 69, 142, 8, 99, 37, 240, 21, 10, 23,
+                190, 6, 148, 247, 120, 234, 75, 0, 26, 197, 62, 94, 252, 219, 203, 117, 35, 11, 32, 57, 177, 33,
+                88, 237, 149, 56, 87, 174, 20, 125, 136, 171, 168, 68, 175, 74, 165, 71, 134, 139, 48, 27, 166,
+                77, 146, 158, 231, 83, 111, 229, 122, 60, 211, 133, 230, 220, 105, 92, 41, 55, 46, 245, 40, 244,
+                102, 143, 54, 65, 25, 63, 161, 1, 216, 80, 73, 209, 76, 132, 187, 208, 89, 18, 169, 200, 196,
+                135, 130, 116, 188, 159, 86, 164, 100, 109, 198, 173, 186, 3, 64, 52, 217, 226, 250, 124, 123,
+                5, 202, 38, 147, 118, 126, 255, 82, 85, 212, 207, 206, 59, 227, 47, 16, 58, 17, 182, 189, 28, 42,
+                223, 183, 170, 213, 119, 248, 152, 2, 44, 154, 163, 70, 221, 153, 101, 155, 167, 43, 172, 9,
+                129, 22, 39, 253, 19, 98, 108, 110, 79, 113, 224, 232, 178, 185, 112, 104, 218, 246, 97, 228,
+                251, 34, 242, 193, 238, 210, 144, 12, 191, 179, 162, 241, 81, 51, 145, 235, 249, 14, 239, 107,
+                49, 192, 214, 31, 181, 199, 106, 157, 184, 84, 204, 176, 115, 121, 50, 45, 127, 4, 150, 254,
+                138, 236, 205, 93, 222, 114, 67, 29, 24, 72, 243, 141, 128, 195, 78, 66, 215, 61, 156, 180];
+
+            permutationTable = [...this.#permBase, ...this.#permBase]
+
+            #table = new Array(512)
+
+            constructor() {
+                const gradient = Vector.gradient
+
+                for (let i = 0; i < this.#permBase.length; i++) {
+                    const rdmVec = this.#permBase[i];
+
+                    this.#table[i] = this.#table[i + 256] = gradient[rdmVec % 12]
+                }
+            }
+
+            value(x) {
+                return this.#table[x]
+            }
+        }
+
+        class PerlinNoise {
+            static gradientTable = new GradientTable()
+
+            static #fade(t) {
+                return t * t * t * (t * (t * 6 - 15) + 10)
+            }
+
+            static #lerp(a, b, t) {
+                return (1 - t) * a + t * b;
+            }
+
+            static #getCellOrigin(x, y) {
+                return new Vector(
+                    Math.floor(x),
+                    Math.floor(y)
+                )
+            }
+
+            static #getCellVector(orignVector, x, y) {
+                return new Vector(
+                    x - orignVector.x,
+                    y - orignVector.y
+                )
+            }
+
+            static value(x, y) {
+                const orign = this.#getCellOrigin(x, y)
+                const relativeVector = this.#getCellVector(orign, x, y)
+
+                const oX = orign.x & 0xff
+                const oY = orign.y & 0xff
+
+                //get noise corner contribution
+                // n01--n11     
+                //  |    |
+                // n00--n10
+
+                const n00 = this.gradientTable.value(
+                    oX + this.gradientTable.permutationTable[oY]
+                ).scalar2(relativeVector)
+
+
+                const n01 = this.gradientTable.value(
+                    oX + this.gradientTable.permutationTable[oY + 1]
+                ).scalar2(new Vector(
+                    relativeVector.x,
+                    relativeVector.y - 1
+                ))
+
+                const n10 = this.gradientTable.value(
+                    oX + 1 + this.gradientTable.permutationTable[oY]
+                ).scalar2(new Vector(
+                    relativeVector.x - 1,
+                    relativeVector.y
+                ))
+
+                const n11 = this.gradientTable.value(
+                    oX + 1 + this.gradientTable.permutationTable[oY + 1]
+                ).scalar2(new Vector(
+                    relativeVector.x - 1,
+                    relativeVector.y - 1
+                ))
+
+                // get the fade value of x
+                const u = this.#fade(relativeVector.x)
+
+                // Interpolate the noise result
+                return this.#lerp(
+                    this.#lerp(n00, n10, u),
+                    this.#lerp(n01, n11, u),
+                    this.#fade(relativeVector.y)
+                )
+            }
+        }
+
+        class MapGenerator {
+
+            constructor(node, scale, octaves, lacunarity, persistance) {
+                this.node = node
+                this.scale = scale
+
+                this.noiseMap = []
+                this.map = []
+
+                this.#generate(octaves, lacunarity, persistance)
+            }
+
+            #seedGeneration() {
+                return 2227.56755583442
+                // return Math.random() * 200_000 / 2
+            }
+
+            #generate(octaves, lacunarity, persistance) {
+                const seed = this.#seedGeneration()
+
+                for (let y = 0; y < this.node; y++) {
+                    const noseLigne = []
+                    const mapLigne = []
+                    for (let x = 0; x < this.node; x++) {
+
+                        let amplitude = 1
+                        let frequency = 1
+                        let noisHeight = 0
+
+                        for (let octave = 0; octave < octaves; octave++) {
+                            const Sx = x / this.scale * frequency + seed
+                            const Sy = y / this.scale * frequency + seed
+
+                            const perlinValue = PerlinNoise.value(Sx, Sy)
+
+                            noisHeight += perlinValue * amplitude
+                            amplitude *= persistance
+                            frequency *= lacunarity
+                        }
+                        noseLigne.push(noisHeight)
+
+                        let tile = 3
+
+                        if (noisHeight < -0.3) {
+                            tile = 0
+                        } else if (noisHeight < 0) {
+                            tile = 1
+                        } else if (noisHeight < 0.3) {
+                            tile = 2
+                        }
+
+                        mapLigne.push(tile)
+                    }
+                    this.noiseMap.push(noseLigne)
+                    this.map.push(mapLigne)
+                }
+            }
+        }
+
+        async function run() {
+            const map = new MapGenerator(80, 20, 4, 2, 0.3)
+                .map.slice(0, 20).map(x => x.slice(0, 20))
+
+            const size = 32
+
+            let darkGrass = new Image();
+            let grass = new Image();
+            let sand = new Image();
+            let watter = new Image();
+
+            await new Promise(r => darkGrass.onload = r, darkGrass.src = 'dark-grass.png');
+            await new Promise(r => grass.onload = r, grass.src = 'grass.png');
+            await new Promise(r => sand.onload = r, sand.src = 'sand.png');
+            await new Promise(r => watter.onload = r, watter.src = 'watter.png');
+
+            const canvas = document.getElementById("can");
+            canvas.width = 640
+            canvas.height = 640
+
+            const ctx = canvas.getContext('2d')
+
+            for (let y = 0; y < map.length; y++) {
+                for (let x = 0; x < map[y].length; x++) {
+
+                    let tile = darkGrass
+                    switch (map[y][x]) {
+                        case 0:
+                            tile = watter
+                            break;
+                        case 1:
+                            tile = sand
+                            break;
+                        case 2:
+                            tile = grass
+                            break;
+
+                        default:
+                            tile = darkGrass
+                            break;
+                    }
+
+                    ctx.drawImage(tile, 0, 128, size, size, x * size, y * size, size, size)
+                }
+            }
+
+            for (let y = 0; y < map.length; y++) {
+                for (let x = 0; x < map[y].length; x++) {
+                    if (map[y][x] == 0) {
+                        if (map?.[y]?.[x - 1] == 1) {
+                            ctx.drawImage(watter, 0, 32, size / 2, size, (x - 1) * size + 24, y * size, size / 2, size)
+                        }
+                        if (map?.[y - 1]?.[x] == 1) {
+                            ctx.drawImage(watter, 0, 64, size, size / 2, x * size, (y - 1) * size + 24, size, size / 2)
+                        }
+                        if (map?.[y + 1]?.[x] == 1) {
+                            ctx.drawImage(watter, 0, 80, size, size / 2, x * size, (y + 1) * size - 8, size, size / 2)
+                        }
+
+                        if (map?.[y]?.[x - 1] == 1 && map?.[y -1]?.[x] == 1) {
+                            ctx.drawImage(watter, 0, 0, size / 2, size /2,
+                                (x-1) * size + 24,
+                                (y-1) * size + 24,
+                                size / 2, size /2)
+                        }
+                    }
+                }
+            }
+        }
+
+        run()
+
+        // for (const ligne of toto) {
+        //     for (const tile of ligne) {
+                // let color = ''
+
+                // if (tile < -0.3) {
+                //     color = '#4682B4'
+                // } else if (tile < 0) {
+                //     color = '#FFE4C4'
+                // } else if (tile < 0.3) {
+                //     color = '#228B22'
+                // } else if (tile < 0.5) {
+                //     color = '#008000'
+                // } else if (tile < 0.7) {
+                //     color = '#8B4513'
+                // } else if (tile < 0.8) {
+                //     color = '#D3D3D3'
+                // } else {
+                //     color = '#FFFAFA'
+                // }
+
+                // document.querySelector('#test').insertAdjacentHTML('beforeend', `
+                //     <div class='tile' style='background: ${color}'></div>
+                // `)
+        //     }
+        // }
+    </script>
+</body>
+
+</html>
