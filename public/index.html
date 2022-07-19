@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    <canvas id="can"></canvas>
+    <script>
+        async function run() {
+            const  data = await fetch('/map-generator').then(x => x.json())
+            const map = data.slice(0, 20).map(x => x.slice(0, 20))
+
+            const size = 32
+
+            let darkGrass = new Image();
+            let grass = new Image();
+            let sand = new Image();
+            let watter = new Image();
+
+            await new Promise(r => darkGrass.onload = r, darkGrass.src = 'dark-grass.png');
+            await new Promise(r => grass.onload = r, grass.src = 'grass.png');
+            await new Promise(r => sand.onload = r, sand.src = 'sand.png');
+            await new Promise(r => watter.onload = r, watter.src = 'watter.png');
+
+            const canvas = document.getElementById("can");
+            canvas.width = 640
+            canvas.height = 640
+
+            const ctx = canvas.getContext('2d')
+
+            for (let y = 0; y < map.length; y++) {
+                for (let x = 0; x < map[y].length; x++) {
+
+                    let tile = darkGrass
+                    switch (map[y][x]) {
+                        case 0:
+                            tile = watter
+                            break;
+                        case 1:
+                            tile = sand
+                            break;
+                        case 2:
+                            tile = grass
+                            break;
+
+                        default:
+                            tile = darkGrass
+                            break;
+                    }
+
+                    ctx.drawImage(tile, 0, 128, size, size, x * size, y * size, size, size)
+                }
+            }
+
+            for (let y = 0; y < map.length; y++) {
+                for (let x = 0; x < map[y].length; x++) {
+                    if (map[y][x] == 0) {
+                        if (map?.[y]?.[x - 1] == 1) {
+                            ctx.drawImage(watter, 0, 32, size / 2, size, (x - 1) * size + 24, y * size, size / 2, size)
+                        }
+                        if (map?.[y - 1]?.[x] == 1) {
+                            ctx.drawImage(watter, 0, 64, size, size / 2, x * size, (y - 1) * size + 24, size, size / 2)
+                        }
+                        if (map?.[y + 1]?.[x] == 1) {
+                            ctx.drawImage(watter, 0, 80, size, size / 2, x * size, (y + 1) * size - 8, size, size / 2)
+                        }
+
+                        if (map?.[y]?.[x - 1] == 1 && map?.[y -1]?.[x] == 1) {
+                            ctx.drawImage(watter, 0, 0, size / 2, size /2,
+                                (x-1) * size + 24,
+                                (y-1) * size + 24,
+                                size / 2, size /2)
+                        }
+                    }
+                }
+            }
+        }
+
+        run()
+
+        // for (const ligne of toto) {
+        //     for (const tile of ligne) {
+                // let color = ''
+
+                // if (tile < -0.3) {
+                //     color = '#4682B4'
+                // } else if (tile < 0) {
+                //     color = '#FFE4C4'
+                // } else if (tile < 0.3) {
+                //     color = '#228B22'
+                // } else if (tile < 0.5) {
+                //     color = '#008000'
+                // } else if (tile < 0.7) {
+                //     color = '#8B4513'
+                // } else if (tile < 0.8) {
+                //     color = '#D3D3D3'
+                // } else {
+                //     color = '#FFFAFA'
+                // }
+
+                // document.querySelector('#test').insertAdjacentHTML('beforeend', `
+                //     <div class='tile' style='background: ${color}'></div>
+                // `)
+        //     }
+        // }
+    </script>
+</body>
+
+</html>
