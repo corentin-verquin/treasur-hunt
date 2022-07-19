@@ -1,5 +1,5 @@
 export enum TileType{
-    WATTER,
+    WATER,
     SAND,
     GRASS,
     DARK_GRASS,
