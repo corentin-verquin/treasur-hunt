@@ -2,6 +2,7 @@ import { Inject } from "@nestjs/common";
 import { Iconfig } from '../../configuration'
 import PerlinNoise from "./utils/PerlinNoise";
 import { TileType } from "./utils/TileType";
+import Vector from "./utils/Vector";
 
 export default class MapGeneratorService {
     constructor(
@@ -56,6 +57,38 @@ export default class MapGeneratorService {
         return tile
     }
 
+    #schedulingTile(map: TileType[][]) {
+        const types = Object.keys(TileType)
+            .filter(x => !(parseInt(x) >= 0))
+            .map(x => ({ [x]: [] }))
+            .reduce((x, y) => ({ ...x, ...y }))
+
+        for (let y = 0; y < map.length; y++) {
+            for (let x = 0; x < map[y].length; x++) {
+
+                const tileType = TileType[map[y][x]]
+                const coord = new Vector(x, y)
+                const neighbor: TileType[] = []
+
+                //store neighbor
+                neighbor.push(map?.[y - 1]?.[x - 1] ?? TileType.WALL)
+                neighbor.push(map?.[y - 1]?.[x] ?? TileType.WALL)
+                neighbor.push(map?.[y - 1]?.[x + 1] ?? TileType.WALL)
+
+                neighbor.push(map?.[y]?.[x - 1] ?? TileType.WALL)
+                neighbor.push(map?.[y]?.[x + 1] ?? TileType.WALL)
+
+                neighbor.push(map?.[y + 1]?.[x - 1] ?? TileType.WALL)
+                neighbor.push(map?.[y + 1]?.[x] ?? TileType.WALL)
+                neighbor.push(map?.[y + 1]?.[x + 1] ?? TileType.WALL)
+
+                types[tileType].push({ coord, neighbor })
+            }
+        }
+
+        return types
+    }
+
     public generate() {
 
         const map = []
@@ -65,7 +98,7 @@ export default class MapGeneratorService {
             const mapLigne = []
             for (let x = 0; x < this.configuration.node; x++) {
                 const noisHeight = this.#octaveGeneration(x, y)
-                const tile = this.#tileGeneration(noisHeight,level)
+                const tile = this.#tileGeneration(noisHeight, level)
 
 
                 mapLigne.push(tile)
@@ -74,7 +107,7 @@ export default class MapGeneratorService {
             map.push(mapLigne)
         }
 
-        return map
+        return this.#schedulingTile(map)
     }
 }
 
